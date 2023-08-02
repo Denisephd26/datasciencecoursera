@@ -1,0 +1,463 @@
+---
+title: "Codebook"
+author: "Denise Wilson"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Study design and data processing
+
+### Collection of the raw data
+
+The experiments have been carried out with a group of 30 volunteers within an age bracket of 19-48 years. Each person performed six activities (WALKING, WALKING_UPSTAIRS, WALKING_DOWNSTAIRS, SITTING, STANDING, LAYING) wearing a smartphone (Samsung Galaxy S II) on the waist. Using its embedded accelerometer and gyroscope, we captured 3-axial linear acceleration and 3-axial angular velocity at a constant rate of 50Hz. The experiments have been video-recorded to label the data manually. The obtained dataset has been randomly partitioned into two sets, where 70% of the volunteers was selected for generating the training data and 30% the test data.
+
+The sensor signals (accelerometer and gyroscope) were pre-processed by applying noise filters and then sampled in fixed-width sliding windows of 2.56 sec and 50% overlap (128 readings/window). The sensor acceleration signal, which has gravitational and body motion components, was separated using a Butterworth low-pass filter into body acceleration and gravity. The gravitational force is assumed to have only low frequency components, therefore a filter with 0.3 Hz cutoff frequency was used. From each window, a vector of features was obtained by calculating variables from the time and frequency domain. See 'features_info.txt' for more details.
+
+### For each record it is provided:
+
+-   Triaxial acceleration from the accelerometer (total acceleration) and the estimated body acceleration.
+-   Triaxial Angular velocity from the gyroscope.
+-   A 561-feature vector with time and frequency domain variables.
+-   Its activity label.
+-   An identifier of the subject who carried out the experiment.
+
+### Notes on the original (raw) data
+
+Eight files in the zip file are listed below with their description:
+
+-   activity_labels.txt: Contains the code for each activity measured
+-   features.txt: Contains the list of all the variables in the X_test and X_train files
+-   features_info: Discusses the variables used on the feature vector and what they are
+-   subject_test: Contains the subject numbers for all the variables in test group
+-   Subject_train: Contains the subject numbers for all the variables in train group
+-   X_test: Contains the subject measurements for all the variables from the test group
+-   X_train: Contains the subject measurements for all the variables from the train group
+-   y_test: Contains the labels for the activities of each of the subjects in the test group
+-   y_train: Contains the labels for the activities of each of the subjects in the train group
+
+## Creating the tidy datafile
+
+### Guide to create the tidy data file
+
+NOTE: Be sure the tidyr and dplyr packages are loaded before starting.
+
+```{r eval = FALSE}
+library(tidyr)
+library(dplyr)
+```
+
+1.  Download the data in a zip file from <https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip>.
+2.  Unzip the files.
+3.  Read subject files.
+
+```{r eval = FALSE}
+subject_test_data <- read.table("subject_test.txt", col.names = "subject")
+subject_train_data <- read.table("subject_train.txt", col.names = "subject")
+```
+
+4.  Read feature file, assigning 'code' and 'feature' for column names.
+
+```{r eval = FALSE}
+feature_labels <- read.table("features.txt", col.names = c("code","feature"))
+```
+
+5.  Modify names of mean and standard deviation variables in feature file to be more descriptive and remove special characters.
+
+```{r eval = FALSE}
+feature_labels$feature <- gsub("tBodyAcc","TimeBodyAcceleration",feature_labels$feature)
+feature_labels$feature <- gsub("tGravityAcc","TimeGravityAcceleration", feature_labels$feature)
+feature_labels$feature <- gsub("tBodyGyro","TimeBodyGyroscope",feature_labels$feature)
+feature_labels$feature <- gsub("fBodyAcc","FreqBodyAcceleration",feature_labels$feature)
+feature_labels$feature <- gsub("fBodyGyro","FreqBodyGyroscope",feature_labels$feature)
+feature_labels$feature <- gsub("fBodyBodyAccJerkMag","FreqBodyAccelerationJerkMagnitude",feature_labels$feature) 
+feature_labels$feature <- gsub("fBodyBodyGyroMag","FreqBodyGyroscopeMagnitude",feature_labels$feature)
+feature_labels$feature <- gsub("fBodyBodyGyroJerkMag","FreqBodyGyroscopeJerkMagnitude",feature_labels$feature)
+feature_labels$feature <- gsub("-mean\\(\\)","Mean",feature_labels$feature)
+feature_labels$feature <- gsub("-std\\(\\)","Std",feature_labels$feature)
+feature_labels$feature <- gsub("-","",feature_labels$feature)
+```
+
+6.  Read X_test and X_train files, then assign variable names in feature file for column names.
+
+```{r eval = FALSE}
+x_test <- read.table("X_test.txt")
+colnames(x_test) = feature_labels$feature
+x_train <- read.table("X_train.txt")
+colnames(x_train) = feature_labels$feature
+```
+
+7.  Read y_test and y_train files.
+
+```{r eval = FALSE}
+y_test <- read.table("y_test.txt",col.names="activitycode")
+y_train <- read.table("y_train.txt", col.names="activitycode")
+```
+
+8.  Read activity_label file, assigning 'code' and 'activity' for the column names.
+
+```{r eval = FALSE}
+activity_labels <- read.table("activity_labels.txt", col.names = c("activitycode","activity"))
+```
+
+9.  Bind all the test data together into one data frame (subject, activity, variables).
+
+```{r eval = FALSE}
+test <- cbind(subject_test_data,activity=y_test$activitycode,x_test)
+```
+
+10. Bind all the train data together into one data frame (subject, activity, variables).
+
+```{r eval = FALSE}
+train <- cbind(subject_train_data,activity =y_train$activitycode,x_train)
+```
+
+11. Bind the test and train data together into the master data frame, dat.
+
+```{r eval = FALSE}
+dat <- rbind(test,train)
+```
+
+12. Sort out the variables which contain "Mean" or "Std" in their name and exluding the variables with "angle".
+
+```{r eval = FALSE}
+meanstd<-select(dat,(contains("Mean",ignore.case = FALSE)|contains("Std",ignore.case = FALSE))&!contains("angle")) 
+```
+
+13. Add the subject and activity columns to the sorted data frame.
+
+```{r eval = FALSE}
+meanstd <- cbind(dat[1:2],meanstd)
+```
+
+14. Convert the activity codes to activity names.
+
+```{r eval = FALSE}
+for(i in 1:nrow(meanstd)) {
+        meanstd$activity[i] <- activity_labels[meanstd$activity[i],2]
+        }
+```
+
+15. Group the sorted data by subject and activity.
+
+```{r eval = FALSE}
+meanstd <-group_by(meanstd, subject, activity)
+```
+
+16. Summarize the columns by finding the mean for each subject and activity.
+
+```{r eval = FALSE}
+sum_table <- summarize_each(meanstd,mean)
+```
+
+17. Write tidy data file.
+
+```{r eval = FALSE}
+write.csv(sum_table, file="Activity_Means.csv")
+```
+
+### Cleaning of the data
+
+Variable names for selected variables in the feature file are modified to remove special characters and be more descriptive. All the data tables are combined into one table. Next selected variables are sorted out. The activity code is converted to activity names.
+
+## Description of the variables in the Activity_Means.csv file
+
+Activity_Means.csv file has 180 observations and 68 variables with a header row.  The first six columns are displayed below.  
+
+```{r sum_table, echo=FALSE}
+knitr::kable(sum_table[1:6], "simple")
+```
+
+### Variable Information
+
+[1] subject - integer   
+
+* number representing each subject  
+  + values:  1:30  
+
+[2] activity - character
+
+* activity completed by subject 
+  + WALKING 
+  + WALKING_UPSTAIRS 
+  + WALKING_DOWNSTAIRS 
+  + SITTING 
+  + STANDING 
+  + LAYING
+  
+[3] TimeBodyAccelerationMeanX  - numeric
+
+* body accelerometer time mean value - X direction
+
+[4] TimeBodyAccelerationMeanY - numeric 
+
+* body accelerometer time mean value - Y direction
+
+[5] TimeBodyAccelerationMeanZ  - numeric  
+
+* body accelerometer time mean value - Z direction
+
+[6] TimeGravityAccelerationMeanX - numeric 
+
+* gravity accelerometer time mean value - X direction
+
+[7] TimeGravityAccelerationMeanY - numeric 
+
+* gravity accelerometer time mean value - Y direction
+
+[8] TimeGravityAccelerationMeanZ - numeric 
+
+* gravity accelerometer time mean value - z direction
+
+[9] TimeBodyAccelerationJerkMeanX - numeric 
+
+* Jerk signal derived from body linear acceleration - X direction
+
+[10] TimeBodyAccelerationJerkMeanY - numeric 
+
+* Jerk signal derived from body linear acceleration - Y direction
+
+[11] TimeBodyAccelerationJerkMeanZ  - numeric 
+
+* Jerk signal derived from body linear acceleration - Z direction
+
+[12] TimeBodyGyroscopeMeanX - numeric
+
+* body gyroscope mean - X direction
+
+[13] TimeBodyGyroscopeMeanY - numeric 
+
+* body gyroscope mean - Y direction
+
+[14] TimeBodyGyroscopeMeanZ - numeric 
+
+* body gyroscope mean - Z direction
+
+[15] TimeBodyGyroscopeJerkMeanX - numeric 
+
+* Jerk signal derived from body gyroscope mean - X direction
+
+[16] TimeBodyGyroscopeJerkMeanY - numeric 
+
+* Jerk signal derived from body gyroscope mean - Y direction
+
+[17] TimeBodyGyroscopeJerkMeanZ - numeric 
+
+* Jerk signal derived from body gyroscope mean - Z direction
+
+[18] TimeBodyAccelerationMagMean - numeric 
+
+* magnitude of the three-dimensional signals from body acceleration mean
+
+[19] TimeGravityAccelerationMagMean - numeric 
+
+* magnitude of the three-dimensional signals from gravity acceleration mean
+
+[20] TimeBodyAccelerationJerkMagMean - numeric 
+
+* magnitude of the three-dimensional signals from body acceleration jerk signal mean
+
+[21] TimeBodyGyroscopeMagMean - numeric 
+
+* magnitude of the three-dimensional signals from body gyroscope mean
+
+[22] TimeBodyGyroscopeJerkMagMean - numeric 
+
+* magnitude of the three-dimensional signals from body gyroscope jerk signal mean
+
+[23] FreqBodyAccelerationMeanX - numeric 
+
+* fast fourier transform applied to body acceleration mean - X direction
+
+[24] FreqBodyAccelerationMeanY - numeric 
+
+* fast fourier transform applied to body acceleration mean - Y direction
+
+[25] FreqBodyAccelerationMeanZ - numeric 
+
+* fast fourier transform applied to body acceleration mean - Z direction
+
+[26] FreqBodyAccelerationJerkMeanX - numeric 
+
+* fast fourier transform applied to Jerk signal derived from body linear acceleration - X direction
+
+[27] FreqBodyAccelerationJerkMeanY - numeric 
+
+* fast fourier transform applied to Jerk signal derived from body linear acceleration - Y direction
+
+[28] FreqBodyAccelerationJerkMeanZ - numeric 
+
+* fast fourier transform applied to Jerk signal derived from body linear acceleration - Z direction
+
+[29] FreqBodyGyroscopeMeanX - numeric 
+
+* fast fourier transform applied to body gyroscope mean - X direction
+
+[30] FreqBodyGyroscopeMeanY - numeric 
+
+* fast fourier transform applied to body gyroscope mean - Y direction
+
+[31] FreqBodyGyroscopeMeanZ - numeric 
+
+* fast fourier transform applied to body gyroscope mean - Z direction
+
+[32] FreqBodyAccelerationMagMean - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body acceleration mean
+
+[33] FreqBodyAccelerationJerkMagnitudeMean - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body acceleration mean
+
+[34] FreqBodyGyroscopeMagnitudeMean - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body gyroscope mean
+
+[35] FreqBodyGyroscopeJerkMagnitudeMean - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body gyroscope jerk signal mean
+
+[36] TimeBodyAccelerationStdX - numeric 
+
+* body accelerometer time standard deviation value - X direction
+
+[37] TimeBodyAccelerationStdY - numeric 
+
+* body accelerometer time standard deviation value - Y direction
+
+[38] TimeBodyAccelerationStdZ - numeric 
+
+* body accelerometer time standard deviation value - Z direction
+
+[39] TimeGravityAccelerationStdX - numeric 
+
+* gravity accelerometer time standard deviation value - X direction
+
+[40] TimeGravityAccelerationStdY - numeric 
+
+* gravity accelerometer time standard deviation value - Y direction
+
+[41] TimeGravityAccelerationStdZ - numeric 
+
+* gravity accelerometer time standard deviation value - z direction
+
+[42] TimeBodyAccelerationJerkStdX - numeric 
+
+* Jerk signal derived from body linear acceleration - X direction
+
+[43] TimeBodyAccelerationJerkStdY - numeric 
+
+* Jerk signal derived from body linear acceleration - Y direction
+
+[44] TimeBodyAccelerationJerkStdZ - numeric 
+
+* Jerk signal derived from body linear acceleration - Z direction
+
+[45] TimeBodyGyroscopeStdX - numeric 
+
+* body gyroscope standard deviation - X direction
+
+[46] TimeBodyGyroscopeStdY - numeric 
+
+* body gyroscope standard deviation - Y direction
+
+[47] TimeBodyGyroscopeStdZ - numeric 
+
+* body gyroscope standard deviation - Z direction
+
+[48] TimeBodyGyroscopeJerkStdX - numeric 
+
+* Jerk signal derived from body gyroscope standard deviation - X direction
+
+[49] TimeBodyGyroscopeJerkStdY - numeric 
+
+* Jerk signal derived from body gyroscope standard deviation - Y direction
+
+[50] TimeBodyGyroscopeJerkStdZ - numeric 
+
+* Jerk signal derived from body gyroscope standard deviation - Z direction
+
+[51] TimeBodyAccelerationMagStd - numeric 
+
+* magnitude of the three-dimensional signals from body acceleration standard deviation
+
+[52] TimeGravityAccelerationMagStd - numeric 
+
+* magnitude of the three-dimensional signals from gravity acceleration standard deviation
+
+[53] TimeBodyAccelerationJerkMagStd - numeric 
+
+* magnitude of the three-dimensional signals from body acceleration jerk signal standard deviation
+
+[54] TimeBodyGyroscopeMagStd - numeric 
+
+* magnitude of the three-dimensional signals from body gyroscope standard deviation
+
+[55] TimeBodyGyroscopeJerkMagStd - numeric 
+
+* magnitude of the three-dimensional signals from body gyroscope jerk signal standard deviation
+
+[56] FreqBodyAccelerationStdX - numeric 
+
+* fast fourier transform applied to body acceleration standard deviation - X direction
+
+[57] FreqBodyAccelerationStdY - numeric 
+
+* fast fourier transform applied to body acceleration standard deviation - Y direction
+
+[58] FreqBodyAccelerationStdZ - numeric 
+
+* fast fourier transform applied to body acceleration standard deviation - Z direction
+
+[59] FreqBodyAccelerationJerkStdX - numeric 
+
+* fast fourier transform applied to Jerk signal derived from body linear acceleration - X direction
+
+[60] FreqBodyAccelerationJerkStdY - numeric 
+
+* fast fourier transform applied to Jerk signal derived from body linear acceleration - Y direction
+
+[61] FreqBodyAccelerationJerkStdZ - numeric 
+
+* fast fourier transform applied to Jerk signal derived from body linear acceleration - Z direction
+
+[62] FreqBodyGyroscopeStdX - numeric 
+
+* fast fourier transform applied to body gyroscope standard deviation - X direction
+
+[63] FreqBodyGyroscopeStdY - numeric 
+
+* fast fourier transform applied to body gyroscope standard deviation - Y direction
+
+[64] FreqBodyGyroscopeStdZ - numeric 
+
+* fast fourier transform applied to body gyroscope standard deviation - Z direction
+
+[65] FreqBodyAccelerationMagStd - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body acceleration standard deviation
+
+[66] FreqBodyAccelerationJerkMagnitudeStd - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body acceleration standard deviation
+
+[67] FreqBodyGyroscopeMagnitudeStd - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body gyroscope standard deviation
+
+[68] FreqBodyGyroscopeJerkMagnitudeStd - numeric 
+
+* fast fourier transform applied to magnitude of the three-dimensional signals from body gyroscope jerk signal standard deviation
+
+The feature variables [3:68] are normalized and bounded between [-1,1]
+
+Units for accelerations are 'g's (gravity of earth is 9.80665 m/seg2)
+
+Units for gyroscope are rad/seg
+
+## Sources
+
+Reyes-Ortiz,Jorge, Anguita,Davide, Ghio,Alessandro, Oneto,Luca, and Parra,Xavier. (2012). Human Activity Recognition Using Smartphones. UCI Machine Learning Repository. <https://doi.org/10.24432/C54S4K>.
